@@ -1,0 +1,20 @@
+{
+  "name": "OnionDAO Tetris",
+  "version": "1.0.0",
+  "description": "Classic Tetris with weekly Onion token prizes",
+  "scripts": [
+    {
+      "name": "qr.lua",
+      "url": "https://MysticOnChain.github.io/onion-tetris/qr.lua",
+      "autorun": false,
+      "description": "QR code encoder library"
+    },
+    {
+      "name": "tetris.lua",
+      "url": "https://MysticOnChain.github.io/onion-tetris/tetris.lua",
+      "autorun": false,
+      "description": "Tetris game with weekly leaderboard and Onion token prizes"
+    }
+  ],
+  "images": []
+}

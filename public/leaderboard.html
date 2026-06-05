@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧅 OnionDAO Tetris — Weekly Leaderboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:  #7fff00;
+      --gold:   #ffd700;
+      --silver: #c0c0c0;
+      --bronze: #cd7f32;
+      --bg:     #080808;
+      --bg2:    #0e0e0e;
+      --bg3:    #141414;
+      --border: #222;
+      --text:   #d4d4d4;
+      --muted:  #555;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Hero banner ─────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(180deg, #0d1f00 0%, #080808 100%);
+      border-bottom: 1px solid #1a2e00;
+      padding: 40px 20px 32px;
+      text-align: center;
+    }
+
+    .hero-emoji { font-size: 3rem; display: block; margin-bottom: 8px; }
+
+    .hero h1 {
+      font-size: clamp(1.6rem, 5vw, 2.6rem);
+      color: var(--green);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero-sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 6px;
+    }
+
+    .hero-tagline {
+      margin-top: 18px;
+      display: inline-block;
+      background: #0d1f00;
+      border: 1px solid #2e4a00;
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      color: var(--green);
+      border-radius: 2px;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────── */
+    .page { max-width: 780px; margin: 0 auto; padding: 32px 16px 60px; }
+
+    /* ── Prize pool card ─────────────────────────────────────────────── */
+    .prize-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--gold);
+      padding: 28px 24px;
+      margin-bottom: 28px;
+    }
+
+    .prize-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .prize-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .prize-total-num {
+      font-size: 2.8rem;
+      font-weight: bold;
+      color: var(--gold);
+      line-height: 1;
+    }
+
+    .prize-total-unit {
+      font-size: 1rem;
+      color: #888;
+      margin-left: 6px;
+    }
+
+    .prize-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .prize-places {
+      display: flex;
+      gap: 16px;
+    }
+
+    .prize-place {
+      text-align: center;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 14px 18px;
+      min-width: 88px;
+    }
+
+    .prize-place .emoji { font-size: 1.8rem; display: block; }
+    .prize-place .amount {
+      font-size: 1.3rem;
+      font-weight: bold;
+      display: block;
+      margin-top: 4px;
+    }
+    .prize-place .unit { font-size: 0.7rem; color: var(--muted); }
+    .place-1 .amount { color: var(--gold); }
+    .place-2 .amount { color: var(--silver); }
+    .place-3 .amount { color: var(--bronze); }
+
+    /* How the pool works */
+    .pool-explainer {
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      padding: 16px 18px;
+      font-size: 0.82rem;
+    }
+
+    .pool-explainer h3 {
+      color: var(--green);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .pool-explainer ol {
+      padding-left: 20px;
+      color: #aaa;
+      line-height: 1.8;
+    }
+
+    .pool-explainer ol li::marker { color: var(--green); }
+
+    .pool-explainer .highlight {
+      color: var(--green);
+      font-weight: bold;
+    }
+
+    /* ── Timer bar ───────────────────────────────────────────────────── */
+    .timer-bar {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 14px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .timer-week { font-size: 0.8rem; color: var(--muted); }
+    .timer-count {
+      font-size: 1.05rem;
+      font-weight: bold;
+      color: var(--gold);
+    }
+    .timer-count.urgent { color: #ff4444; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* ── Leaderboard ─────────────────────────────────────────────────── */
+    .board-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .board-head {
+      display: grid;
+      grid-template-columns: 48px 1fr 120px 52px 60px 100px;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .board-row {
+      display: grid;
+      grid-template-columns: 48px 1fr 120px 52px 60px 100px;
+      gap: 6px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #111;
+      align-items: center;
+      transition: background 0.15s;
+    }
+
+    .board-row:hover { background: #0c0c0c; }
+
+    .board-row.r1 {
+      background: #0e1800;
+      border-left: 3px solid var(--gold);
+    }
+    .board-row.r2 {
+      background: #0c0c0e;
+      border-left: 3px solid var(--silver);
+    }
+    .board-row.r3 {
+      background: #110d08;
+      border-left: 3px solid var(--bronze);
+    }
+
+    .rank-col { font-size: 1.2rem; }
+
+    .id-col .badge-id {
+      font-size: 0.82rem;
+      color: #aaa;
+      font-weight: bold;
+    }
+    .id-col .wallet {
+      font-size: 0.68rem;
+      color: #444;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+
+    .score-col {
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--text);
+      text-align: right;
+    }
+    .r1 .score-col { color: var(--gold); }
+
+    .stat-col {
+      font-size: 0.8rem;
+      color: #666;
+      text-align: center;
+    }
+
+    .prize-col { text-align: center; }
+
+    .prize-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: bold;
+      letter-spacing: 0.06em;
+      padding: 4px 8px;
+      border-radius: 2px;
+      line-height: 1;
+    }
+    .r1 .prize-badge { background: var(--gold);   color: #000; }
+    .r2 .prize-badge { background: var(--silver); color: #000; }
+    .r3 .prize-badge { background: var(--bronze); color: #000; }
+
+    .no-scores {
+      text-align: center;
+      padding: 70px 20px;
+      color: #333;
+      border: 1px solid var(--border);
+    }
+    .no-scores .big { font-size: 3rem; margin-bottom: 14px; }
+    .no-scores p { color: #444; font-size: 0.85rem; }
+
+    /* ── Sections ─────────────────────────────────────────────────────── */
+    .section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 28px 24px;
+      margin-top: 28px;
+    }
+
+    .section h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--green);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Rules */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .rule-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 16px;
+    }
+
+    .rule-card .icon { font-size: 1.4rem; margin-bottom: 8px; display: block; }
+    .rule-card h3 { font-size: 0.78rem; color: var(--green); margin-bottom: 6px; }
+    .rule-card p  { font-size: 0.75rem; color: #777; line-height: 1.6; }
+
+    /* Install steps */
+    .steps { counter-reset: step; }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #111;
+    }
+    .step:last-child { border-bottom: none; }
+
+    .step-num {
+      counter-increment: step;
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      background: var(--green);
+      color: #000;
+      font-weight: bold;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step-body h3 { font-size: 0.82rem; color: var(--text); margin-bottom: 4px; }
+    .step-body p  { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
+
+    code {
+      background: #060e00;
+      color: #a8ff00;
+      padding: 4px 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      display: inline-block;
+      margin-top: 6px;
+      word-break: break-all;
+    }
+
+    code.block {
+      display: block;
+      padding: 10px 14px;
+      margin-top: 8px;
+    }
+
+    /* Controls table */
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg3);
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+    }
+
+    .control-key {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    .control-action { font-size: 0.75rem; color: #888; }
+
+    /* FAQ */
+    .faq-item { padding: 14px 0; border-bottom: 1px solid #111; }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-q { font-size: 0.82rem; color: var(--text); margin-bottom: 6px; }
+    .faq-q::before { content: "Q: "; color: var(--green); }
+    .faq-a { font-size: 0.75rem; color: var(--muted); line-height: 1.7; }
+    .faq-a::before { content: "A: "; color: #444; }
+
+    /* Footer */
+    footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+      color: #333;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    footer a { color: #555; text-decoration: none; }
+    footer a:hover { color: var(--green); }
+
+    /* Responsive */
+    @media (max-width: 520px) {
+      .board-head,
+      .board-row {
+        grid-template-columns: 38px 1fr 90px 40px;
+      }
+      .board-head .level-h,
+      .board-row .stat-col.level,
+      .board-head .prize-h { display: none; }
+      .prize-places { flex-wrap: wrap; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <span class="hero-emoji">🧅</span>
+  <h1>OnionDAO Tetris</h1>
+  <div class="hero-sub">Earn Onion tokens for stacking blocks. No cap.</div>
+  <div class="hero-tagline">⚡ Weekly contest · Top 3 win real Onion tokens every Monday</div>
+</div>
+
+<div class="page">
+
+  <!-- ── Prize pool ──────────────────────────────────────────────────────── -->
+  <div class="prize-card">
+    <div class="prize-card-header">
+      <div>
+        <div class="prize-label">This week's prize pool</div>
+        <div class="prize-total-num">175 <span class="prize-total-unit">ONION</span></div>
+        <div class="prize-note">Funded weekly · Sent manually every Monday</div>
+      </div>
+      <div class="prize-places">
+        <div class="prize-place place-1">
+          <span class="emoji">🥇</span>
+          <span class="amount">100</span>
+          <span class="unit">ONION</span>
+        </div>
+        <div class="prize-place place-2">
+          <span class="emoji">🥈</span>
+          <span class="amount">50</span>
+          <span class="unit">ONION</span>
+        </div>
+        <div class="prize-place place-3">
+          <span class="emoji">🥉</span>
+          <span class="amount">25</span>
+          <span class="unit">ONION</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pool-explainer">
+      <h3>💡 How the prize pool works</h3>
+      <ol>
+        <li>The <span class="highlight">175 ONION prize pool</span> is funded each week by OnionDAO from the community treasury — no entry fee, ever.</li>
+        <li>Play Tetris on your badge all week. Your <span class="highlight">best score</span> counts — submit as many games as you like (up to 20/day).</li>
+        <li>At game over, your badge displays a <span class="highlight">QR code</span>. Scan it with your phone to submit your score + Solana wallet address automatically.</li>
+        <li>Scores reset every <span class="highlight">Monday at midnight UTC</span>. The leaderboard starts fresh.</li>
+        <li>Winners receive Onion tokens on Monday after the reset — sent via <span class="highlight">Onion ID on oniondao.dev</span> or direct to wallet. No claiming required.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ── Countdown ───────────────────────────────────────────────────────── -->
+  <div class="timer-bar">
+    <span class="timer-week" id="week-label">Current week loading...</span>
+    <span class="timer-count" id="countdown">—</span>
+  </div>
+
+  <!-- ── Live leaderboard ────────────────────────────────────────────────── -->
+  <div class="board-title">🏆 Live Rankings — Current Week</div>
+  <div class="board-head">
+    <span>#</span>
+    <span>Badge / Wallet</span>
+    <span style="text-align:right">Score</span>
+    <span style="text-align:center">Lvl</span>
+    <span style="text-align:center" class="level-h">Lines</span>
+    <span style="text-align:center" class="prize-h">Prize</span>
+  </div>
+  <div id="rows"></div>
+
+  <!-- ── How to get on the board ─────────────────────────────────────────── -->
+  <div class="section">
+    <h2>📥 Install Tetris on your badge</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Connect your badge via USB</h3>
+          <p>Open a serial monitor (VS Code + Serial Monitor extension, PuTTY, or Arduino IDE) at 115200 baud.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Set your WiFi credentials</h3>
+          <p>Type these commands in the serial monitor:</p>
+          <code class="block">wifi-ssid YOUR_NETWORK_NAME<br>wifi-password YOUR_PASSWORD</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Point badge to the Tetris manifest</h3>
+          <p>This tells OnionOS where to download the game from:</p>
+          <code class="block">scripts-url https://MysticOnChain.github.io/onion-tetris/manifest.json</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Reboot and play!</h3>
+          <p>Type <code>reboot</code> or unplug/replug. The badge downloads Tetris automatically and shows it in the launcher. Select it to start playing.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>Submit your score</h3>
+          <p>When your game ends, your badge shows a QR code. Scan it with your phone — it opens this leaderboard and records your score + wallet address automatically.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Controls ────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2>🎮 Badge Controls</h2>
+    <div class="controls">
+      <div class="control-row">
+        <span class="control-key">LEFT</span>
+        <span class="control-action">Move piece left</span>
+      </div>
+      <div class="control-row">
+        <span class="control-key">RIGHT</span>
+        <span class="control-action">Move piece right</span>
+      </div>
+      <div class="control-row">
+        <span class="control-key">UP</span>
+        <span class="control-action">Rotate clockwise</span>
+      </div>
+      <div class="control-row">
+        <span class="control-key">DOWN</span>
+        <span class="control-action">Soft drop (1 row)</span>
+      </div>
+      <div class="control-row">
+        <span class="control-key">SELECT</span>
+        <span class="control-action">Hard drop (instant)</span>
+      </div>
+      <div class="control-row">
+        <span class="control-key">CANCEL</span>
+        <span class="control-action">Pause / resume</span>
+      </div>
+    </div>
+    <p style="font-size:0.73rem;color:var(--muted);margin-top:14px;">
+      💡 Tip: The piece falls every 1 second at Level 1. Each 10 lines cleared = new level. At Level 10 the piece falls every 100ms — how far can you go?
+    </p>
+  </div>
+
+  <!-- ── Scoring ─────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2>📊 Scoring</h2>
+    <div class="rules-grid">
+      <div class="rule-card">
+        <span class="icon">1️⃣</span>
+        <h3>Single (1 line)</h3>
+        <p>40 × current level. Bread and butter — keep clearing!</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">2️⃣</span>
+        <h3>Double (2 lines)</h3>
+        <p>100 × level. Worth setting up for.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">3️⃣</span>
+        <h3>Triple (3 lines)</h3>
+        <p>300 × level. Stack tight, reward big.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">🔥</span>
+        <h3>Tetris (4 lines)</h3>
+        <p>1200 × level. The only way to win on the leaderboard. Hold the I-piece.</p>
+      </div>
+    </div>
+    <div class="pool-explainer" style="margin-top:0">
+      <h3>📈 Level progression</h3>
+      <ol>
+        <li>Every <span class="highlight">10 lines cleared</span> = level up</li>
+        <li>Each level, the piece drops <span class="highlight">100ms faster</span> (starts at 1000ms, minimum 100ms)</li>
+        <li>Higher level = more score per line. <span class="highlight">Play fast, score big.</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ── Contest rules ───────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2>📋 Contest Rules</h2>
+    <div class="rules-grid">
+      <div class="rule-card">
+        <span class="icon">📅</span>
+        <h3>Weekly cycle</h3>
+        <p>Each contest runs Monday to Sunday midnight UTC. Scores reset automatically every Monday.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">🏅</span>
+        <h3>Best score wins</h3>
+        <p>Only your highest score from the week counts. Submit as many games as you want — 20 per day max.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">🔑</span>
+        <h3>Real badge required</h3>
+        <p>Scores are tied to your badge's hardware ID. You need an OnionDAO badge to participate.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">👛</span>
+        <h3>Wallet needed for prizes</h3>
+        <p>Your badge wallet address (shown in the QR code) is where tokens land. Make sure OnionOS has your wallet set up.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">💸</span>
+        <h3>Token delivery</h3>
+        <p>Winners receive Onion tokens every Monday after the weekly reset — sent directly to the wallet submitted with your top score.</p>
+      </div>
+      <div class="rule-card">
+        <span class="icon">🚫</span>
+        <h3>Fair play</h3>
+        <p>Scores are validated against plausibility limits. Cheating gets your badge ID banned. Play fair, win real tokens.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FAQ ─────────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2>❓ FAQ</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">How does the prize pool get funded?</div>
+      <div class="faq-a">The 175 ONION prize pool is funded each week from the OnionDAO community treasury. The pool is NOT held on this website — tokens are sent directly from the OnionDAO wallet to winners after each weekly reset. No entry fee, no buy-in, ever.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I make sure I receive my tokens?</div>
+      <div class="faq-a">Two ways work — whichever your badge has set up:<br><br>
+      <strong style="color:var(--green)">Option 1 — Onion ID (easiest):</strong> If your badge is linked to an OnionDAO profile, your Onion ID is submitted automatically. The organizer can send tokens directly on <a href="https://oniondao.dev" target="_blank" style="color:var(--green)">oniondao.dev</a> using your ID — no wallet address needed.<br><br>
+      <strong style="color:var(--green)">Option 2 — Wallet address:</strong> If your badge has a Solana wallet configured, that address is submitted with your score. Tokens are sent directly to it. Check your wallet via the OnionOS serial console (<code>wallet</code> command).</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I submit scores from multiple games?</div>
+      <div class="faq-a">Yes — submit up to 20 games per day. Only your single highest score from the week appears on the leaderboard. More games = more chances to set a record.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What if two badges tie on score?</div>
+      <div class="faq-a">In case of an exact tie on score, the tiebreaker is lines cleared (higher = better), then level reached, then earliest submission time. So submit your big score early in the week!</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I see my own badge's score history?</div>
+      <div class="faq-a">Your badge ID (first 8 chars shown publicly) is tied to your hardware. You can recognize your entry by your badge ID — visible in the OnionOS serial console via the <code>id</code> command.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I don't have an OnionDAO badge. Can I still play?</div>
+      <div class="faq-a">You need a physical OnionDAO badge with OnionOS installed to participate in the contest. Check <a href="https://oniondao.dev" target="_blank" style="color:var(--green)">oniondao.dev</a> to get yours!</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">The leaderboard shows my wallet address — is that safe?</div>
+      <div class="faq-a">Solana wallet addresses are public by design — they are safe to share. Only the first 14 characters are shown here. The full address is stored privately and used only for prize delivery.</div>
+    </div>
+  </div>
+
+  <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+  <footer>
+    <span>🧅 OnionDAO Tetris · Prizes sent every Monday · <a href="https://oniondao.dev" target="_blank">oniondao.dev</a></span>
+    <span>Built by <a href="https://github.com/MysticOnChain" target="_blank">MysticOnChain</a> · <a href="https://github.com/MysticOnChain/onion-tetris" target="_blank">Source</a></span>
+  </footer>
+
+</div><!-- end .page -->
+
+<script>
+const API     = 'https://onion-tetris.vercel.app/leaderboard-data';
+const MEDALS  = ['🥇','🥈','🥉'];
+const PRIZES  = ['100 ONION','50 ONION','25 ONION'];
+
+// ── ISO week helpers ──────────────────────────────────────────────────────────
+function isoWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const ys = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - ys) / 86400000) + 1) / 7);
+}
+
+function nextMonday() {
+  const now = new Date();
+  const d   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() + (day === 0 ? 1 : 8 - day));
+  return d;
+}
+
+function fmt(ms) {
+  if (ms <= 0) return 'Resetting now!';
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000)  / 60000);
+  const s = Math.floor((ms % 60000)    / 1000);
+  return `⏳ ${d}d ${h}h ${m}m ${s}s until reset`;
+}
+
+function trunc(str, n) {
+  if (!str) return '—';
+  return str.length > n ? str.slice(0, n) + '…' : str;
+}
+
+// ── Render rows ───────────────────────────────────────────────────────────────
+function renderRows(top10) {
+  const el = document.getElementById('rows');
+  if (!top10 || top10.length === 0) {
+    el.innerHTML = `<div class="no-scores">
+      <div class="big">🧅</div>
+      <p>No scores yet this week — be the first!</p>
+      <p style="margin-top:6px;color:#333">Play a game and scan the QR code at game over.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = top10.map((row, i) => {
+    const rank    = i + 1;
+    const cls     = rank <= 3 ? `r${rank}` : '';
+    const medal   = MEDALS[i] || rank;
+    const badge   = trunc(row.badge_id, 8);
+
+    // Priority: @handle > Onion ID > wallet address
+    const identity = row.onion_handle
+      ? `@${row.onion_handle}`
+      : row.onion_id
+        ? `🧅 Onion #${row.onion_id}`
+        : row.wallet_address
+          ? trunc(row.wallet_address, 16)
+          : 'No ID set';
+
+    const prize = rank <= 3
+      ? `<span class="prize-badge">${PRIZES[i]}</span>`
+      : `<span style="color:#333;font-size:0.75rem">#${rank}</span>`;
+
+    return `<div class="board-row ${cls}">
+      <span class="rank-col">${medal}</span>
+      <div class="id-col">
+        <div class="badge-id">${badge}</div>
+        <div class="wallet">${identity}</div>
+      </div>
+      <span class="score-col">${row.score.toLocaleString()}</span>
+      <span class="stat-col">${row.level}</span>
+      <span class="stat-col level">${row.lines}</span>
+      <span class="prize-col">${prize}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Load from API ─────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const res  = await fetch(API);
+    const data = await res.json();
+    const wk   = data.week || isoWeek(new Date());
+    const yr   = data.year || new Date().getFullYear();
+    document.getElementById('week-label').textContent =
+      `Week ${wk} · ${yr} — scores reset every Monday 00:00 UTC`;
+    renderRows(data.top10);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('rows').innerHTML =
+      '<div class="no-scores"><p>Could not load rankings. Refresh to try again.</p></div>';
+  }
+}
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+function startCountdown() {
+  function tick() {
+    const ms = nextMonday() - Date.now();
+    const el = document.getElementById('countdown');
+    el.textContent = fmt(ms);
+    el.className   = 'timer-count' + (ms < 7200000 ? ' urgent' : '');
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('week-label').textContent =
+  `Week ${isoWeek(new Date())} — loading scores...`;
+
+load();
+startCountdown();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
