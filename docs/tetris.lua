@@ -2,7 +2,9 @@
 -- Display: 264x176 landscape
 -- Controls: left/right=move, up=rotate, down=soft drop, select=hard drop, cancel=pause
 
-local qr = require("qr")
+-- OnionOS stores scripts as /scripts_NAME.lua — use dofile instead of require
+local ok, qr = pcall(dofile, "/scripts_qr.lua")
+if not ok then qr = { render = function() onion.log("QR unavailable") end } end
 
 -- ── Layout constants ──────────────────────────────────────────────────────────
 local CELL      = 8          -- pixels per cell
