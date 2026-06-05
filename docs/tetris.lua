@@ -263,34 +263,30 @@ local function handle_input(btn)
 
   if btn.left and not prev_btn.left then
     if can_place(piece.type, piece.rot, piece.x-1, piece.y) then
-      draw_piece_cells(piece, false)
       piece.x = piece.x - 1
-      draw_piece_cells(piece, true)
+      dirty = true
     end
   end
 
   if btn.right and not prev_btn.right then
     if can_place(piece.type, piece.rot, piece.x+1, piece.y) then
-      draw_piece_cells(piece, false)
       piece.x = piece.x + 1
-      draw_piece_cells(piece, true)
+      dirty = true
     end
   end
 
   if btn.up and not prev_btn.up then
     local new_rot = piece.rot % #PIECES[piece.type] + 1
     if can_place(piece.type, new_rot, piece.x, piece.y) then
-      draw_piece_cells(piece, false)
       piece.rot = new_rot
-      draw_piece_cells(piece, true)
+      dirty = true
     end
   end
 
   if btn.down and not prev_btn.down then
     if can_place(piece.type, piece.rot, piece.x, piece.y+1) then
-      draw_piece_cells(piece, false)
       piece.y = piece.y + 1
-      draw_piece_cells(piece, true)
+      dirty = true
     end
     elapsed = 0   -- reset gravity timer on soft drop
   end
@@ -314,9 +310,8 @@ end
 local function gravity_tick()
   if paused or over or not piece then return end
   if can_place(piece.type, piece.rot, piece.x, piece.y+1) then
-    draw_piece_cells(piece, false)
     piece.y = piece.y + 1
-    draw_piece_cells(piece, true)
+    dirty = true
   else
     lock_piece()
     local cleared = clear_lines()
@@ -332,6 +327,7 @@ spawn_piece()
 full_redraw()
 
 while not over do
+  -- Read buttons BEFORE any potential blocking refresh
   local btn = onion.buttons()
   handle_input(btn)
 
@@ -342,8 +338,18 @@ while not over do
   end
 
   if dirty then
-    full_redraw()
+    full_redraw()          -- blocks ~1-2s for E-Ink refresh
     dirty = false
+    -- Read buttons AGAIN right after refresh catches presses made during it
+    local btn2 = onion.buttons()
+    if btn2.left  ~= btn.left  or btn2.right ~= btn.right or
+       btn2.up    ~= btn.up    or btn2.down  ~= btn.down  or
+       btn2.select~= btn.select or btn2.cancel~= btn.cancel then
+      handle_input(btn2)
+    end
+    -- If player held a button while display refreshed, clear elapsed
+    -- so we don't immediately trigger another gravity drop
+    elapsed = 0
   end
 
   onion.sleep(POLL_MS)
