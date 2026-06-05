@@ -189,7 +189,9 @@ local function draw_hud()
 end
 
 local function full_redraw()
-  onion.clear_display()
+  -- All calls use clear=false so they only write to canvas (no E-Ink refresh each time)
+  -- onion.flush() at the end does ONE refresh for the whole frame
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})  -- white background
   -- Board border
   onion.display_rect(BX-2, BY-2, COLS*CELL+4, ROWS*CELL+4, {fill=false, color="black"})
   -- Settled cells
@@ -204,18 +206,22 @@ local function full_redraw()
   draw_hud()
   -- Divider between board and HUD
   onion.display_line(BX + COLS*CELL + 4, 0, BX + COLS*CELL + 4, 176, {color="black"})
+  -- Single flush — ONE E-Ink refresh for the whole frame
+  onion.flush()
 end
 
 local function draw_paused()
-  onion.clear_display()
-  onion.display_text("PAUSED",           90, 60,  {color="black", font="bold"})
-  onion.display_text("CANCEL to resume", 60, 100, {color="black"})
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
+  onion.display_text("PAUSED",           90, 60,  {clear=false, color="black", font="bold"})
+  onion.display_text("CANCEL to resume", 60, 100, {clear=false, color="black"})
+  onion.flush()
 end
 
 -- ── Game over + QR ────────────────────────────────────────────────────────────
 local function show_game_over()
   onion.clear_display()
-  onion.display_text("GAME OVER",          50, 4,  {color="black", font="bold"})
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
+  onion.display_text("GAME OVER",          50, 4,  {clear=false, color="black", font="bold"})
   onion.display_text("Score: " .. score,   50, 28, {clear=false, color="black"})
   onion.display_text("Level: " .. level,   50, 40, {clear=false, color="black"})
   onion.display_text("Lines: " .. lines,   50, 52, {clear=false, color="black"})
@@ -241,6 +247,7 @@ local function show_game_over()
     onion.display_text("Onion ID: " .. oid,      10, 155, {clear=false, color="black"})
   end
   onion.display_text("onion-tetris.vercel.app",  10, 165, {clear=false, color="black"})
+  onion.flush()  -- single refresh for the whole game over screen
 end
 
 -- ── Input ─────────────────────────────────────────────────────────────────────
