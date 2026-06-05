@@ -157,17 +157,18 @@ end
 
 local function draw_hud()
   local x = HUD_X
+  local O = {clear=false, color="black"}
   -- Score
-  onion.display_text("SCORE", x, 4,  1, {color="black"})
-  onion.display_text(tostring(score), x, 14, 1, {color="black"})
+  onion.display_text("SCORE",          x, 4,  O)
+  onion.display_text(tostring(score),  x, 14, O)
   -- Level
-  onion.display_text("LEVEL", x, 30, 1, {color="black"})
-  onion.display_text(tostring(level), x, 40, 1, {color="black"})
+  onion.display_text("LEVEL",          x, 30, O)
+  onion.display_text(tostring(level),  x, 40, O)
   -- Lines
-  onion.display_text("LINES", x, 56, 1, {color="black"})
-  onion.display_text(tostring(lines), x, 66, 1, {color="black"})
+  onion.display_text("LINES",          x, 56, O)
+  onion.display_text(tostring(lines),  x, 66, O)
   -- Next piece preview
-  onion.display_text("NEXT", x, 82, 1, {color="black"})
+  onion.display_text("NEXT",           x, 82, O)
   if nxt then
     local s = shape(nxt, 1)
     for i = 0, 15 do
@@ -181,10 +182,10 @@ local function draw_hud()
     end
   end
   -- Controls hint
-  onion.display_text("L/R:move", x, 136, 1, {color="black"})
-  onion.display_text("UP:rot",   x, 147, 1, {color="black"})
-  onion.display_text("DN:soft",  x, 158, 1, {color="black"})
-  onion.display_text("SEL:drop", x, 169, 1, {color="black"})
+  onion.display_text("L/R:move", x, 136, O)
+  onion.display_text("UP:rot",   x, 147, O)
+  onion.display_text("DN:soft",  x, 158, O)
+  onion.display_text("SEL:drop", x, 169, O)
 end
 
 local function full_redraw()
@@ -207,18 +208,18 @@ end
 
 local function draw_paused()
   onion.clear_display()
-  onion.display_text("PAUSED", 90, 60,  2, {color="black"})
-  onion.display_text("CANCEL to resume", 60, 100, 1, {color="black"})
+  onion.display_text("PAUSED",           90, 60,  {color="black", font="bold"})
+  onion.display_text("CANCEL to resume", 60, 100, {color="black"})
 end
 
 -- ── Game over + QR ────────────────────────────────────────────────────────────
 local function show_game_over()
   onion.clear_display()
-  onion.display_text("GAME OVER", 50, 4, 2, {color="black"})
-  onion.display_text("Score: " .. score, 50, 28, 1, {color="black"})
-  onion.display_text("Level: " .. level, 50, 40, 1, {color="black"})
-  onion.display_text("Lines: " .. lines, 50, 52, 1, {color="black"})
-  onion.display_text("Scan to submit:", 50, 68, 1, {color="black"})
+  onion.display_text("GAME OVER",          50, 4,  {color="black", font="bold"})
+  onion.display_text("Score: " .. score,   50, 28, {clear=false, color="black"})
+  onion.display_text("Level: " .. level,   50, 40, {clear=false, color="black"})
+  onion.display_text("Lines: " .. lines,   50, 52, {clear=false, color="black"})
+  onion.display_text("Scan to submit:",    50, 68, {clear=false, color="black"})
 
   -- Build submission URL — includes hardware ID, Onion ID, wallet, and score
   local hw  = onion.hardware_id() or "000000000000"
@@ -237,9 +238,9 @@ local function show_game_over()
 
   -- Show Onion ID for manual prize lookup
   if oid ~= "0" then
-    onion.display_text("Onion ID: " .. oid, 10, 155, 1, {color="black"})
+    onion.display_text("Onion ID: " .. oid,      10, 155, {clear=false, color="black"})
   end
-  onion.display_text("onion-tetris.vercel.app", 10, 165, 1, {color="black"})
+  onion.display_text("onion-tetris.vercel.app",  10, 165, {clear=false, color="black"})
 end
 
 -- ── Input ─────────────────────────────────────────────────────────────────────
