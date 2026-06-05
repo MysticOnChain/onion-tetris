@@ -1,10 +1,12 @@
 // /api/leaderboard-data — returns JSON leaderboard for current week
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+  return createClient(url, key);
+}
 
 function isoWeek(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -21,32 +23,42 @@ function isoWeekYear(date) {
 
 function nextMonday() {
   const now = new Date();
-  const d   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const day = d.getUTCDay();
   d.setUTCDate(d.getUTCDate() + (day === 0 ? 1 : 8 - day));
   return d.toISOString();
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+
   const now  = new Date();
   const week = isoWeek(now);
   const year = isoWeekYear(now);
 
-  // Fetch top 50 scores for this week, ordered by score desc
+  let supabase;
+  try {
+    supabase = getSupabase();
+  } catch (e) {
+    console.error('Supabase init error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+
   const { data, error } = await supabase
     .from('scores')
     .select('badge_id, onion_id, onion_handle, wallet_address, score, lines, level, submitted_at')
     .eq('week_number', week)
-    .eq('week_year',   year)
+    .eq('week_year', year)
     .order('score', { ascending: false })
     .limit(50);
 
   if (error) {
-    console.error('Leaderboard query error:', error);
-    return res.status(500).json({ error: 'Database error' });
+    console.error('Leaderboard query error:', JSON.stringify(error));
+    return res.status(500).json({ error: 'Database error', detail: error.message });
   }
 
-  // Deduplicate: keep best score per badge
+  // Deduplicate — best score per badge
   const seen  = new Set();
   const top10 = [];
   for (const row of (data || [])) {
@@ -67,7 +79,6 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.json({
     week,
     year,
@@ -75,4 +86,4 @@ export default async function handler(req, res) {
     prizes:  { first: 100, second: 50, third: 25, currency: 'ONION' },
     top10,
   });
-}
+};

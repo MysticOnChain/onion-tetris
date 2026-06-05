@@ -1,27 +1,12 @@
 // /api/submit — score submission endpoint
 // Called directly by QR code scan: GET /s?i=HWID&oid=ONIONID&sc=SCORE&l=LINES&lv=LEVEL&w=WALLET
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
-
-// Look up @handle from numeric Onion ID via oniondao.dev public profile API
-async function resolveHandle(onionId) {
-  if (!onionId || onionId === 0) return null;
-  try {
-    const res = await fetch(
-      `https://oniondao.dev/api/public/profile/${onionId}`,
-      { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(3000) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    // Profile response contains username/handle field
-    return data.username || data.handle || data.name || null;
-  } catch {
-    return null;   // don't block score submission if lookup fails
-  }
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+  return createClient(url, key);
 }
 
 function isoWeek(date) {
@@ -37,19 +22,28 @@ function isoWeekYear(date) {
   return d.getFullYear();
 }
 
-export default async function handler(req, res) {
-  // Support both /submit and /s routes
+// Look up @handle from numeric Onion ID via oniondao.dev public profile API
+async function resolveHandle(onionId) {
+  if (!onionId || onionId === 0) return null;
+  try {
+    const res = await fetch(
+      `https://oniondao.dev/api/public/profile/${onionId}`,
+      { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.username || data.handle || data.name || null;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = async function handler(req, res) {
   const { i, sc, l, lv, w, oid } = req.query;
 
   // ── Validation ──────────────────────────────────────────────────────────────
-  if (!i || !sc) {
-    return res.status(400).send('Missing required params: i (badge id) and sc (score)');
-  }
-
-  // Badge ID: 12-char hex (ESP32 MAC address)
-  if (!/^[A-Fa-f0-9]{12}$/.test(i)) {
-    return res.status(400).send('Invalid badge ID format');
-  }
+  if (!i || !sc) return res.status(400).send('Missing required params: i and sc');
+  if (!/^[A-Fa-f0-9]{12}$/.test(i)) return res.status(400).send('Invalid badge ID');
 
   const scoreInt = parseInt(sc,  10);
   const linesInt = parseInt(l   || '0', 10);
@@ -57,38 +51,29 @@ export default async function handler(req, res) {
   const wallet   = (w  || '').trim();
   const onionId  = parseInt(oid || '0', 10) || null;
 
-  // Resolve @ handle from numeric Onion ID (non-blocking — fails gracefully)
+  if (isNaN(scoreInt) || scoreInt < 0 || scoreInt > 9999999) return res.status(400).send('Invalid score');
+  if (isNaN(linesInt) || linesInt < 0) return res.status(400).send('Invalid lines');
+  if (isNaN(levelInt) || levelInt < 1) return res.status(400).send('Invalid level');
+  if (wallet && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet)) return res.status(400).send('Invalid wallet');
+
+  // ── Resolve handle ─────────────────────────────────────────────────────────
   const handle = onionId ? await resolveHandle(onionId) : null;
 
-  if (isNaN(scoreInt) || scoreInt < 0 || scoreInt > 9999999) {
-    return res.status(400).send('Invalid score');
-  }
-  if (isNaN(linesInt) || linesInt < 0 || linesInt > 9999) {
-    return res.status(400).send('Invalid lines');
-  }
-  if (isNaN(levelInt) || levelInt < 1 || levelInt > 99) {
-    return res.status(400).send('Invalid level');
-  }
+  // ── Rate limit ─────────────────────────────────────────────────────────────
+  let supabase;
+  try { supabase = getSupabase(); }
+  catch (e) { return res.status(500).send(e.message); }
 
-  // Basic Solana wallet address validation (base58, 32-44 chars)
-  if (wallet && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet)) {
-    return res.status(400).send('Invalid wallet address');
-  }
-
-  // ── Rate limiting: max 20 submissions per badge per day ───────────────────
   const dayAgo = new Date(Date.now() - 86400000).toISOString();
-  const { count, error: countErr } = await supabase
+  const { count } = await supabase
     .from('scores')
     .select('id', { count: 'exact', head: true })
     .eq('badge_id', i.toUpperCase())
     .gte('submitted_at', dayAgo);
 
-  if (countErr) console.error('Count error:', countErr);
-  if (count >= 20) {
-    return res.status(429).send('Rate limit: max 20 submissions per badge per day');
-  }
+  if (count >= 20) return res.status(429).send('Rate limit: 20 submissions per badge per day');
 
-  // ── Insert score ───────────────────────────────────────────────────────────
+  // ── Insert ─────────────────────────────────────────────────────────────────
   const now  = new Date();
   const week = isoWeek(now);
   const year = isoWeekYear(now);
@@ -100,19 +85,15 @@ export default async function handler(req, res) {
     level:          levelInt,
     wallet_address: wallet   || null,
     onion_id:       onionId  || null,
-    onion_handle:   handle   || null,   // @handle resolved from Onion ID
+    onion_handle:   handle   || null,
     week_number:    week,
     week_year:      year,
   });
 
-  if (error) {
-    // 23505 = unique constraint violation (duplicate score) — silently ignore
-    if (error.code !== '23505') {
-      console.error('Insert error:', error);
-      return res.status(500).send('Database error');
-    }
+  if (error && error.code !== '23505') {
+    console.error('Insert error:', JSON.stringify(error));
+    return res.status(500).send('Database error');
   }
 
-  // ── Redirect to leaderboard ────────────────────────────────────────────────
   res.redirect(302, 'https://MysticOnChain.github.io/onion-tetris/leaderboard.html');
-}
+};
