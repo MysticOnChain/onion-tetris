@@ -313,6 +313,7 @@ math.randomseed(42)
 board = new_board()
 spawn_piece()
 full_redraw()
+dirty = false  -- initial draw done; prevent extra refresh on first loop iteration
 
 while not over do
   local btn = onion.buttons()
@@ -321,16 +322,15 @@ while not over do
   elapsed = elapsed + POLL_MS
   if elapsed >= tick_ms then
     elapsed = 0
-    gravity_tick()
+    gravity_tick()  -- sets dirty=true
   end
 
   if dirty then
     full_redraw()
     dirty = false
     elapsed = 0
-    -- After E-ink refresh (~1-2s), read current button state so edge
-    -- detection works correctly on the next iteration regardless of
-    -- whether the player held or released a button during the refresh.
+    -- Snapshot button state after the refresh so held buttons don't
+    -- double-trigger on the next iteration.
     prev_btn = onion.buttons()
   end
 
