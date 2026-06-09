@@ -2,19 +2,18 @@
 -- Display: 264x176 landscape
 -- Controls: left/right=move, up=rotate, down=soft drop, select=hard drop, cancel=pause
 
--- OnionOS stores scripts as /scripts_NAME.lua — use dofile instead of require
 local ok, qr = pcall(dofile, "/scripts_qr.lua")
 if not ok then qr = { render = function() onion.log("QR unavailable") end } end
 
 -- ── Layout constants ──────────────────────────────────────────────────────────
-local CELL      = 8          -- pixels per cell
+local CELL      = 8
 local COLS      = 10
 local ROWS      = 20
-local BX        = 4          -- board left edge
-local BY        = 4          -- board top edge
-local HUD_X     = BX + COLS * CELL + 8   -- HUD left edge (x=92)
+local BX        = 4
+local BY        = 4
+local HUD_X     = BX + COLS * CELL + 8   -- x=92
 
--- ── Tetromino definitions (pre-stored rotations, 4×4 flat, 1=filled) ─────────
+-- ── Tetromino definitions ─────────────────────────────────────────────────────
 local PIECES = {
   -- I
   { {0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
@@ -48,8 +47,8 @@ local SCORE_TABLE = {40, 100, 300, 1200}
 
 -- ── Game state ────────────────────────────────────────────────────────────────
 local board    = {}
-local piece    = nil   -- {type, rot, x, y}
-local nxt      = nil   -- next piece type index
+local piece    = nil
+local nxt      = nil
 local score    = 0
 local level    = 1
 local lines    = 0
@@ -59,6 +58,7 @@ local tick_ms  = 1000
 local elapsed  = 0
 local dirty    = true
 local POLL_MS  = 50
+local prev_btn = {}
 
 -- ── Board helpers ─────────────────────────────────────────────────────────────
 local function new_board()
@@ -134,14 +134,12 @@ local function spawn_piece()
 end
 
 -- ── Rendering ─────────────────────────────────────────────────────────────────
+-- Black background, white pieces/text
 local function draw_cell(c, r, filled)
   local x = BX + (c-1)*CELL
   local y = BY + (r-1)*CELL
-  if filled then
-    onion.display_rect(x, y, CELL-1, CELL-1, {fill=true,  color="black"})
-  else
-    onion.display_rect(x, y, CELL-1, CELL-1, {fill=true,  color="white"})
-  end
+  local col = filled and "white" or "black"
+  onion.display_rect(x, y, CELL-1, CELL-1, {fill=true, color=col})
 end
 
 local function draw_piece_cells(p, filled)
@@ -155,20 +153,21 @@ local function draw_piece_cells(p, filled)
   end
 end
 
+-- y values are GFX baselines; FreeMono9pt7b ascent ~11px so first visible y=14
 local function draw_hud()
   local x = HUD_X
-  local O = {clear=false, color="black"}
-  -- Score
-  onion.display_text("SCORE",          x, 4,  O)
-  onion.display_text(tostring(score),  x, 14, O)
-  -- Level
-  onion.display_text("LEVEL",          x, 30, O)
-  onion.display_text(tostring(level),  x, 40, O)
-  -- Lines
-  onion.display_text("LINES",          x, 56, O)
-  onion.display_text(tostring(lines),  x, 66, O)
-  -- Next piece preview
-  onion.display_text("NEXT",           x, 82, O)
+  local O = {clear=false, color="white", background="black"}
+
+  onion.display_text("SCORE",          x, 16,  O)
+  onion.display_text(tostring(score),  x, 28,  O)
+
+  onion.display_text("LEVEL",          x, 46,  O)
+  onion.display_text(tostring(level),  x, 58,  O)
+
+  onion.display_text("LINES",          x, 76,  O)
+  onion.display_text(tostring(lines),  x, 88,  O)
+
+  onion.display_text("NEXT",           x, 106, O)
   if nxt then
     local s = shape(nxt, 1)
     for i = 0, 15 do
@@ -176,24 +175,22 @@ local function draw_hud()
         local pc = (i % 4)
         local pr = math.floor(i / 4)
         local px2 = x + pc*6
-        local py2 = 94 + pr*6
-        onion.display_rect(px2, py2, 5, 5, {fill=true, color="black"})
+        local py2 = 118 + pr*6
+        -- color="white" so preview is visible on black background
+        onion.display_rect(px2, py2, 5, 5, {fill=true, color="white"})
       end
     end
   end
-  -- Controls hint
-  onion.display_text("L/R:move", x, 136, O)
-  onion.display_text("UP:rot",   x, 147, O)
-  onion.display_text("DN:soft",  x, 158, O)
-  onion.display_text("SEL:drop", x, 169, O)
+
+  onion.display_text("L/R:move",  x, 152, O)
+  onion.display_text("UP:rotate", x, 164, O)
 end
 
 local function full_redraw()
-  -- All calls use clear=false so they only write to canvas (no E-Ink refresh each time)
-  -- onion.flush() at the end does ONE refresh for the whole frame
-  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})  -- white background
-  -- Board border
-  onion.display_rect(BX-2, BY-2, COLS*CELL+4, ROWS*CELL+4, {fill=false, color="black"})
+  -- Black background
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="black"})
+  -- Board border (white)
+  onion.display_rect(BX-2, BY-2, COLS*CELL+4, ROWS*CELL+4, {fill=false, color="white"})
   -- Settled cells
   for r = 1, ROWS do
     for c = 1, COLS do
@@ -204,33 +201,30 @@ local function full_redraw()
   if piece then draw_piece_cells(piece, true) end
   -- HUD
   draw_hud()
-  -- Divider between board and HUD
-  onion.display_line(BX + COLS*CELL + 4, 0, BX + COLS*CELL + 4, 176, {color="black"})
-  -- Single flush — ONE E-Ink refresh for the whole frame
+  -- Divider
+  onion.display_line(BX + COLS*CELL + 4, 0, BX + COLS*CELL + 4, 176, {color="white"})
   onion.flush()
 end
 
 local function draw_paused()
-  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
-  onion.display_text("PAUSED",           90, 60,  {clear=false, color="black", font="bold"})
-  onion.display_text("CANCEL to resume", 60, 100, {clear=false, color="black"})
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="black"})
+  onion.display_text("PAUSED",           90, 72,  {clear=false, color="white", background="black", font="bold"})
+  onion.display_text("CANCEL to resume", 40, 100, {clear=false, color="white", background="black"})
   onion.flush()
 end
 
 -- ── Game over + QR ────────────────────────────────────────────────────────────
 local function show_game_over()
-  onion.clear_display()
-  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
-  onion.display_text("GAME OVER",          50, 4,  {clear=false, color="black", font="bold"})
-  onion.display_text("Score: " .. score,   50, 28, {clear=false, color="black"})
-  onion.display_text("Level: " .. level,   50, 40, {clear=false, color="black"})
-  onion.display_text("Lines: " .. lines,   50, 52, {clear=false, color="black"})
-  onion.display_text("Scan to submit:",    50, 68, {clear=false, color="black"})
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="black"})
+  onion.display_text("GAME OVER",          50, 16, {clear=false, color="white", background="black", font="bold"})
+  onion.display_text("Score: " .. score,   50, 34, {clear=false, color="white", background="black"})
+  onion.display_text("Level: " .. level,   50, 48, {clear=false, color="white", background="black"})
+  onion.display_text("Lines: " .. lines,   50, 62, {clear=false, color="white", background="black"})
+  onion.display_text("Scan to submit:",    50, 78, {clear=false, color="white", background="black"})
 
-  -- Build submission URL — includes hardware ID, Onion ID, wallet, and score
   local hw  = onion.hardware_id() or "000000000000"
-  local oid = tostring(onion.onion_id() or 0)   -- Onion ID for oniondao.dev transfers
-  local wlt = onion.wallet()      or ""
+  local oid = tostring(onion.onion_id() or 0)
+  local wlt = onion.wallet() or ""
   local url = "https://onion-tetris.vercel.app/s"
             .. "?i="   .. hw
             .. "&oid=" .. oid
@@ -239,20 +233,16 @@ local function show_game_over()
             .. "&lv="  .. tostring(level)
             .. "&w="   .. wlt
 
-  -- Render QR (module_size=2 → fits on right side of display)
   qr.render(url, 140, 76, 2)
 
-  -- Show Onion ID for manual prize lookup
   if oid ~= "0" then
-    onion.display_text("Onion ID: " .. oid,      10, 155, {clear=false, color="black"})
+    onion.display_text("Onion ID: " .. oid,      10, 155, {clear=false, color="white", background="black"})
   end
-  onion.display_text("onion-tetris.vercel.app",  10, 165, {clear=false, color="black"})
-  onion.flush()  -- single refresh for the whole game over screen
+  onion.display_text("onion-tetris.vercel.app",  10, 168, {clear=false, color="white", background="black"})
+  onion.flush()
 end
 
 -- ── Input ─────────────────────────────────────────────────────────────────────
-local prev_btn = {}
-
 local function handle_input(btn)
   if btn.cancel and not prev_btn.cancel then
     paused = not paused
@@ -288,17 +278,15 @@ local function handle_input(btn)
       piece.y = piece.y + 1
       dirty = true
     end
-    elapsed = 0   -- reset gravity timer on soft drop
+    elapsed = 0
   end
 
   if btn.select and not prev_btn.select then
-    -- Hard drop
-    draw_piece_cells(piece, false)
     while can_place(piece.type, piece.rot, piece.x, piece.y+1) do
       piece.y = piece.y + 1
     end
     lock_piece()
-    local cleared = clear_lines()
+    clear_lines()
     if not over then spawn_piece() end
     dirty = true
   end
@@ -314,20 +302,19 @@ local function gravity_tick()
     dirty = true
   else
     lock_piece()
-    local cleared = clear_lines()
+    clear_lines()
     if not over then spawn_piece() end
     dirty = true
   end
 end
 
 -- ── Main ──────────────────────────────────────────────────────────────────────
-math.randomseed(42)   -- deterministic seed (OnionOS may not have os.time)
+math.randomseed(42)
 board = new_board()
 spawn_piece()
 full_redraw()
 
 while not over do
-  -- Read buttons BEFORE any potential blocking refresh
   local btn = onion.buttons()
   handle_input(btn)
 
@@ -338,18 +325,13 @@ while not over do
   end
 
   if dirty then
-    full_redraw()          -- blocks ~1-2s for E-Ink refresh
+    full_redraw()
     dirty = false
-    -- Read buttons AGAIN right after refresh catches presses made during it
-    local btn2 = onion.buttons()
-    if btn2.left  ~= btn.left  or btn2.right ~= btn.right or
-       btn2.up    ~= btn.up    or btn2.down  ~= btn.down  or
-       btn2.select~= btn.select or btn2.cancel~= btn.cancel then
-      handle_input(btn2)
-    end
-    -- If player held a button while display refreshed, clear elapsed
-    -- so we don't immediately trigger another gravity drop
     elapsed = 0
+    -- After E-ink refresh (~1-2s), read current button state so edge
+    -- detection works correctly on the next iteration regardless of
+    -- whether the player held or released a button during the refresh.
+    prev_btn = onion.buttons()
   end
 
   onion.sleep(POLL_MS)
@@ -357,7 +339,6 @@ end
 
 show_game_over()
 
--- Wait for any button press to exit
 local done = false
 while not done do
   local b = onion.buttons()
