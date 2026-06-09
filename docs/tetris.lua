@@ -134,11 +134,11 @@ local function spawn_piece()
 end
 
 -- ── Rendering ─────────────────────────────────────────────────────────────────
--- Black background, white pieces/text
+-- White background, black pieces/text (matches E-ink waveform flash color)
 local function draw_cell(c, r, filled)
   local x = BX + (c-1)*CELL
   local y = BY + (r-1)*CELL
-  local col = filled and "white" or "black"
+  local col = filled and "black" or "white"
   onion.display_rect(x, y, CELL-1, CELL-1, {fill=true, color=col})
 end
 
@@ -156,7 +156,7 @@ end
 -- y values are GFX baselines; FreeMono9pt7b ascent ~11px so first visible y=14
 local function draw_hud()
   local x = HUD_X
-  local O = {clear=false, color="white", background="black"}
+  local O = {clear=false, color="black", background="white"}
 
   onion.display_text("SCORE",          x, 16,  O)
   onion.display_text(tostring(score),  x, 28,  O)
@@ -176,8 +176,7 @@ local function draw_hud()
         local pr = math.floor(i / 4)
         local px2 = x + pc*6
         local py2 = 118 + pr*6
-        -- color="white" so preview is visible on black background
-        onion.display_rect(px2, py2, 5, 5, {fill=true, color="white"})
+        onion.display_rect(px2, py2, 5, 5, {fill=true, color="black"})
       end
     end
   end
@@ -187,10 +186,10 @@ local function draw_hud()
 end
 
 local function full_redraw()
-  -- Black background
-  onion.display_rect(0, 0, 264, 176, {fill=true, color="black"})
-  -- Board border (white)
-  onion.display_rect(BX-2, BY-2, COLS*CELL+4, ROWS*CELL+4, {fill=false, color="white"})
+  -- White background (matches E-ink waveform so refresh flash is invisible)
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
+  -- Board border (black)
+  onion.display_rect(BX-2, BY-2, COLS*CELL+4, ROWS*CELL+4, {fill=false, color="black"})
   -- Settled cells
   for r = 1, ROWS do
     for c = 1, COLS do
@@ -202,25 +201,25 @@ local function full_redraw()
   -- HUD
   draw_hud()
   -- Divider
-  onion.display_line(BX + COLS*CELL + 4, 0, BX + COLS*CELL + 4, 176, {color="white"})
+  onion.display_line(BX + COLS*CELL + 4, 0, BX + COLS*CELL + 4, 176, {color="black"})
   onion.flush()
 end
 
 local function draw_paused()
-  onion.display_rect(0, 0, 264, 176, {fill=true, color="black"})
-  onion.display_text("PAUSED",           90, 72,  {clear=false, color="white", background="black", font="bold"})
-  onion.display_text("CANCEL to resume", 40, 100, {clear=false, color="white", background="black"})
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
+  onion.display_text("PAUSED",           90, 72,  {clear=false, color="black", background="white", font="bold"})
+  onion.display_text("CANCEL to resume", 40, 100, {clear=false, color="black", background="white"})
   onion.flush()
 end
 
 -- ── Game over + QR ────────────────────────────────────────────────────────────
 local function show_game_over()
-  onion.display_rect(0, 0, 264, 176, {fill=true, color="black"})
-  onion.display_text("GAME OVER",          50, 16, {clear=false, color="white", background="black", font="bold"})
-  onion.display_text("Score: " .. score,   50, 34, {clear=false, color="white", background="black"})
-  onion.display_text("Level: " .. level,   50, 48, {clear=false, color="white", background="black"})
-  onion.display_text("Lines: " .. lines,   50, 62, {clear=false, color="white", background="black"})
-  onion.display_text("Scan to submit:",    50, 78, {clear=false, color="white", background="black"})
+  onion.display_rect(0, 0, 264, 176, {fill=true, color="white"})
+  onion.display_text("GAME OVER",          50, 16, {clear=false, color="black", background="white", font="bold"})
+  onion.display_text("Score: " .. score,   50, 34, {clear=false, color="black", background="white"})
+  onion.display_text("Level: " .. level,   50, 48, {clear=false, color="black", background="white"})
+  onion.display_text("Lines: " .. lines,   50, 62, {clear=false, color="black", background="white"})
+  onion.display_text("Scan to submit:",    50, 78, {clear=false, color="black", background="white"})
 
   local hw  = onion.hardware_id() or "000000000000"
   local oid = tostring(onion.onion_id() or 0)
@@ -236,9 +235,9 @@ local function show_game_over()
   qr.render(url, 140, 76, 2)
 
   if oid ~= "0" then
-    onion.display_text("Onion ID: " .. oid,      10, 155, {clear=false, color="white", background="black"})
+    onion.display_text("Onion ID: " .. oid,      10, 155, {clear=false, color="black", background="white"})
   end
-  onion.display_text("onion-tetris.vercel.app",  10, 168, {clear=false, color="white", background="black"})
+  onion.display_text("onion-tetris.vercel.app",  10, 168, {clear=false, color="black", background="white"})
   onion.flush()
 end
 
